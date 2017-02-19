@@ -3,11 +3,13 @@
 
 # Question 1 (Naked Twins)
 Q: How do we use constraint propagation to solve the naked twins problem?  
-A: *Student should provide answer here*
+A: We iteratively shrink the size of the possible solution space by using
+   logical constraints to eliminate possibilities while solving the puzzle.
 
 # Question 2 (Diagonal Sudoku)
 Q: How do we use constraint propagation to solve the diagonal sudoku problem?  
-A: *Student should provide answer here*
+A: We add constraints to the problem definition so that the solution space is
+   more restricted at the start of the puzzle. 
 
 ### Install
 
