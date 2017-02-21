@@ -5,11 +5,25 @@
 Q: How do we use constraint propagation to solve the naked twins problem?  
 A: We iteratively shrink the size of the possible solution space by using
    logical constraints to eliminate possibilities while solving the puzzle.
+   Just like all other constraints we use during the solution process, such 
+   as removing an assigned box's digit from all the possible remaining values
+   of the box's peers, the Naked Twins constraint allows us to use the fact
+   that certain numbers MUST go in certain places to reason that they CAN'T go
+   in other places. If 4 boxes in a unit all have had their possible assignments
+   reduced to the same 4 digits, we know that none of those 4 digits can be 
+   assigned to the other 5 boxes in the unit.  Thus the other boxes have a 
+   reduced set of possibilities for their assignments.  This reduction then 
+   can propogate further reductions within all the peers of the reduced squares
+   by imposing tighter constraints on their possibilities, and so on.
 
 # Question 2 (Diagonal Sudoku)
 Q: How do we use constraint propagation to solve the diagonal sudoku problem?  
 A: We add constraints to the problem definition so that the solution space is
-   more restricted at the start of the puzzle. 
+   more restricted at the start of the puzzle. By increasing the number of
+   units from 27 to 29 and by increasing the number of peers from 20 to 26 for
+   the 17 diagonal squares, we are able to reduce possible assignment values
+   for many squares right from the start.  This in turn propogates further
+   reductions for peers of the reduced squares, and so on.
 
 ### Install
 

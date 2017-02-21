@@ -1,31 +1,8 @@
 
-
-## Start with the constants and computed variables used in
-##     the AIND classroom solutions, plus diagonal units:
-    
-rows = 'ABCDEFGHI'
-cols = '123456789'
-rev_cols = '987654321'
-
-def cross(A, B):
-    """Cross product of elements in A and elements in B."""
-    return [a + b for a in A for b in B]
-
-boxes = cross(rows, cols)
-
-row_units = [cross(r, cols) for r in rows]
-column_units = [cross(rows, c) for c in cols]
-diag_unit_1 = [[rows[i] + cols[i] for i in range(len(rows))]]
-diag_unit_2 = [[rows[i] + rev_cols[i] for i in range(len(rows))]]
-square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI')
-                              for cs in ('123','456','789')]
-
-unitlist = row_units + column_units + square_units + diag_unit_1 + diag_unit_2
-units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
-peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
+from sudokutils import *
 
 
-assignments = []
+assignments = []  # List used to keep track of the board as it's solved
 
 def assign_value(values, box, value):
     """
@@ -41,61 +18,61 @@ def naked_twins(values):
     This also works for triplets and quadruplets, etc.
     Args:
         values(dict): a dictionary of the form {'box_name': '123456789', ...}
-
     Returns:
         the values dictionary with the naked twins eliminated from unit peers.
     """
-
-    # Find all instances of naked twins, triplets, etc.,
-    ##  and remove their digits from unit peers
+   
     for u in unitlist:
-        vals = [values[box] for box in u if len(values[box]) > 1]
-        twins = set([val for val in vals if len(val) == vals.count(val)])
-        claimed = set([digit for digit in ''.join(twins)])
-        for box in u:
-            if len(values[box]) > 1 and values[box] not in twins:
-                for c in claimed:
-                    assign_value(values, box, values[box].replace(c,''))
+        # Find all instances of naked twins, triplets, etc.
+        twins = find_twins(u, values)
+        
+        if twins:   # If naked twins were found
+            # Trim all twin values from non-twin unit boxes
+            values = trim_boxes(u, twins, values)
+        
     return values
             
-
-
-
-def grid_values(grid):
-    """ 
-    Citation:  Copied from uitls.py in AIND classroom videos.
-    Convert grid into a dict of {square: char} with '123456789' for empties.
+def find_twins(unit, values):
+    """
+    Within a unit of squares, find and return box values that exist within
+    the unit exactly as many times as there are values in the box. 
+    E.g., if there are 3 boxes with the value '789', or 4 with '1358', return
+    that value. This method doesn't look for singletons (boxes that are already
+    assigned), since that is taken care of by the eliminate() method.
     Args:
-        grid(string) - A grid in string form.
+        unit(list): The squares in the unit, which must be keys in "values"
+        values(dict): sudoku squares for keys and poss digit strings for values
     Returns:
-        A grid in dictionary form
-            Keys: The boxes, e.g., 'A1'
-            Values: The value in each box, e.g., '8'. If the box has no value, then the value will be '123456789'.
+        A set of the found twins (triplets, quadruplets, etc.)
     """
-    chars = []
-    digits = '123456789'
-    for c in grid:
-        if c in digits:
-            chars.append(c)
-        if c == '.':
-            chars.append(digits)
-    assert len(chars) == 81
-    return dict(zip(boxes, chars))
-
-def display(values):
+    # Only work on unassigned boxes
+    vals = [values[box] for box in unit if len(values[box]) > 1]
+    # Find and return box values that exist within the unit exactly 
+    #   as many times as there are values in the box. 
+    return set([val for val in vals if len(val) == vals.count(val)])
+        
+def trim_boxes(unit, twins, values):
     """
-    Citation: Copied from utils.py in AIND classroom videos.
-    Display the values as a 2-D grid.
+    Trim digits off possible assignments for sudoku squares
     Args:
-        values(dict): The sudoku in dictionary form
+        unit(list): The squares in the unit, which must be keys in @values
+        twins(set): Strings of digits possible for assignment to a square
+        values(dict): sudoku squares for keys and poss digit strings for values
+    Returns:
+        The values dict with, hopefully, reduced values
     """
-    width = 1+max(len(values[s]) for s in boxes)
-    line = '+'.join(['-'*(width*3)]*3)
-    for r in rows:
-        print(''.join(values[r+c].center(width)+('|' if c in '36' else '')
-                      for c in cols))
-        if r in 'CF': print(line)
-    return
+    # Reduce the set of twins values to whichever digits they comprise.
+    claimed = set([digit for digit in ''.join(twins)])
+    for box in unit:
+    # Use the sets of twins and claimed digits to reduce the remaining
+    #   possibilities for the other boxes within the same unit.
+    # Only look at unassigned boxes not in the twins set
+        if len(values[box]) > 1 and values[box] not in twins:
+            for c in claimed:
+                # Remove any claimed digits from these boxes
+                assign_value(values, box, values[box].replace(c,'')) 
+    return values
+
 
 def eliminate(values):
     """Citation:  This is modified from AIND classroom video solution.
@@ -103,7 +80,7 @@ def eliminate(values):
     Eliminate values from peers of each box with a single value.
 
     Go through all the boxes, and whenever there is a box with a single value,
-    eliminate this value from the set of values of all its peers.
+    eliminate this value from the values of all its peers.
 
     Args:
         values: Sudoku in dictionary form.
@@ -149,7 +126,7 @@ def reduce_puzzle(values):
       return the sudoku, in its (possibly solved) stalled state.
     
     Input: A sudoku in dictionary form.
-    Output: The resulting sudoku in dictionary form.
+    Output: The same sudoku dict with hopefully shorter values
     """
     stalled = False
     while not stalled:
@@ -169,8 +146,11 @@ def reduce_puzzle(values):
     return values
 
 def search(values):
-    """Using depth-first search and propagation, 
-       create a search tree and solve the sudoku.
+    """Use depth-first search to propogate a search tree: Try assigning a digit
+    in a box with the fewest remaining options. If that doesn't return an 
+    unsolveable puzzle, then recursively search its offspring until a legal 
+    solution is returned.  Anytime an assignment leads to a dead end, return 
+    False to backtrack up to the last part of the tree with remaining options.
     """
     ## Reduce the problem size
     vals = reduce_puzzle(values)
@@ -200,12 +180,15 @@ def solve(grid):
     Find the solution to a Sudoku grid.
     Args:
         grid: a string representing a sudoku grid.
-            Example: '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
+            Example: '2.............62....1....7...6..8...3...9...7...6..4...4\
+                      ....8....52.............3'
     Returns:
-        The dictionary representation of the final sudoku grid. False if no solution exists.
+        The dictionary representation of the final sudoku grid. 
+        False if no solution exists.
     """
     result = search(grid_values(grid))
     if not result:
+        # No more backtracking possible, so puzzle is unsolveable
         print('Cannot solve puzzle')
         return False
     else:
@@ -213,7 +196,8 @@ def solve(grid):
     
     
 if __name__ == '__main__':
-    diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
+    diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4..\
+                          .4....8....52.............3'
     display(solve(diag_sudoku_grid))
 
     try:
@@ -223,4 +207,5 @@ if __name__ == '__main__':
     except SystemExit:
         pass
     except:
-        print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+        print('We could not visualize your board due to a pygame issue. Not a \
+               problem! It is not a requirement.')
